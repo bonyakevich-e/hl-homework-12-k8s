@@ -17,7 +17,7 @@
 $ ansible-playbook -i hosts playbook.yml
 ```
 > [!IMPORTANT]
-> Предварительно, при необходимости, нужно изменить ip-адреса виртуальных машин в файлах Vagrantfile, hosts, templates/haproxy, templates/exports. В файле templates/50-vagrant.yaml нужно изменить адрес шлюза по умолчанию, который будет использоваться виртуальными машинами.
+> Предварительно, при необходимости, изменить ip-адреса виртуальных машин в файлах Vagrantfile, hosts, templates/haproxy, templates/exports. В файле templates/50-vagrant.yaml нужно изменить адрес шлюза по умолчанию, который будет использоваться виртуальными машинами.
 
 #### Cхема кластера Kubernetes после развёртывания стенда:
 
