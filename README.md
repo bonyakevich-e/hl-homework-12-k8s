@@ -21,7 +21,7 @@ $ ansible-playbook -i hosts playbook.yml
 
 #### Cхема кластера Kubernetes после развёртывания стенда:
 
-![otus highload scheme v6 kubernetes структурная схема](https://github.com/user-attachments/assets/02ab74f4-6a39-4b32-ae78-8892293103f9)
+![otus highload scheme v6 kubernetes структурная схема](https://github.com/user-attachments/assets/50b39ac2-5de1-45a8-b6bd-88545f69a207)
 
 
 
