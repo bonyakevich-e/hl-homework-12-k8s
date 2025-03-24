@@ -538,5 +538,4 @@
     - name: Install Nextcloud app
       tags: install Nextcloud app
       command: helm install -f /vagrant/values.yml otus nextcloud/nextcloud
-    #- debug:
-    #    msg: "default web url: boardmaps.example.com; login: bmadmin; password: qqq111"
+
