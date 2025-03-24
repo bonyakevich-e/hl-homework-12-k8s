@@ -1,0 +1,542 @@
+- name: All hosts initialization
+  tags: all hosts initialization
+  hosts: all
+  become: true
+  tasks:
+    - name: disable default route
+      tags: change def route
+      ansible.builtin.template:
+        src: templates/01-netcfg.yaml
+        dest: /etc/netplan/01-netcfg.yaml
+        owner: root
+        group: root
+        mode: 0600
+      notify: netplan apply
+
+    - name: add static routers to hosts
+      tags: change def route
+      ansible.builtin.template:
+        src: "50-vagrant.yaml.j2"
+        dest: /etc/netplan/50-vagrant.yaml
+        owner: root
+        group: root
+        mode: 0600
+      notify: netplan apply
+
+    - name: remove 50-cloud-init.yaml
+      tags: change def route
+      ansible.builtin.file:
+        path: /etc/netplan/50-cloud-init.yaml
+        state: absent
+      notify: netplan apply
+
+    - name: Add lines to /etc/hosts
+      tags: setup hosts
+      ansible.builtin.blockinfile:
+        dest: /etc/hosts
+        block: |
+          192.168.30.14 control1
+          192.168.30.15 control2 
+          192.168.30.16 control3 
+          192.168.30.17 node1 
+          192.168.30.18 node2 
+          192.168.30.19 node3 
+          192.168.30.13 balancer
+          192.168.30.12 storage
+        state: present
+
+    - name: Disable ufw service
+      ansible.builtin.service:
+        name: ufw
+        state: stopped
+        enabled: false
+
+    - name: Set timezone to Europe/Moscow
+      community.general.timezone:
+        name: Europe/Moscow
+
+    - name: Uninstall 'ntp' package
+      ansible.builtin.apt:
+        name: ntp
+        state: absent
+
+    - name: Turning "set-ntp" on
+      command: /usr/bin/timedatectl set-ntp on
+
+  handlers:
+    - name: netplan apply
+      command: netplan apply
+
+# ==========================================
+
+- name: Controls and workers additional initialization
+  tags: controls and workers additional initialization
+  hosts: controls,workers
+  become: true
+  tasks:
+    - name: Disable SWAP since kubernetes can't work with swap enabled (1/2)
+      command: swapoff -a
+
+    - name: Disable SWAP in fstab since kubernetes can't work with swap enabled (2/2)
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+        replace: '# \1'
+
+    - name: Load modules "overlay" and "br_netfilter"
+      community.general.modprobe:
+        name: "{{ item }}"
+        state: present
+        persistent: present
+      with_items:
+        - overlay
+        - br_netfilter
+
+    - name: setup forward packages across routers
+      ansible.posix.sysctl:
+        name: "{{ item }}"
+        value: "1"
+        state: present
+      with_items:
+        - net.ipv4.conf.all.forwarding
+        - net.bridge.bridge-nf-call-ip6tables
+        - net.bridge.bridge-nf-call-iptables
+
+    - name: Add Docker's official GPG key
+      ansible.builtin.apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        keyring: /etc/apt/keyrings/docker.gpg
+        state: present
+
+    - name: Add Docker repository
+      ansible.builtin.apt_repository:
+        repo: deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_lsb.codename }} stable
+        filename: docker
+        state: present
+
+    - name: Install additional software
+      tags: install software
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - apt-transport-https
+          - curl
+          - gpg
+          - gnupg2
+          - software-properties-common
+          - containerd.io
+          - nfs-common
+        state: present
+        update_cache: yes
+
+    - name: Add containerd configuration directory
+      ansible.builtin.file:
+        path: /etc/containerd
+        state: directory
+
+    - name: Generate the default config.toml file
+      tags: generate config.toml
+      shell: "containerd config default > /etc/containerd/config.toml"
+
+    - name: Set SystemdGroup=true in the config.toml
+      tags: set SystemdGroup
+      ansible.builtin.lineinfile:
+        path: /etc/containerd/config.toml
+        regexp: '(\s*)SystemdCgroup = false'
+        line: '\1SystemdCgroup = true'
+        backrefs: yes
+      notify: restart containerd
+
+    - name: Install crictl
+      tags: install crictl
+      ansible.builtin.unarchive:
+        src: https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.32.0/crictl-v1.32.0-linux-amd64.tar.gz
+        dest: /usr/local/bin
+        remote_src: yes
+
+    - name: Configure critctl
+      tags: configure critctl
+      ansible.builtin.blockinfile:
+        dest: /etc/crictl.yaml
+        block: |
+          runtime-endpoint: unix:///run/containerd/containerd.sock
+          image-endpoint: unix:///run/containerd/containerd.sock
+          timeout: 2
+          debug: true # <- if you don't want to see debug info you can set this to false
+          pull-image-on-create: false
+        create: true
+
+    - name: Add Kubernetes's official GPG key
+      tags: add kub rep key
+      ansible.builtin.apt_key:
+        url: https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key
+        keyring: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+        state: present
+
+    - name: Add Kubernetes's repository
+      tags: add kub repo
+      ansible.builtin.apt_repository:
+        repo: deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /
+        filename: kubernetes
+        state: present
+
+    - name: Install kubelet kubeadm kubectl
+      tags: install kubs app
+      ansible.builtin.apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: present
+        update_cache: yes
+
+    - name: Apt hold kubelet, kubeadm, kubectl
+      tags: hold kub services
+      ansible.builtin.dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      with_items:
+        - kubelet
+        - kubeadm
+        - kubectl
+
+    - name: Enable kubelet service
+      tags: enable kubelet
+      ansible.builtin.service:
+        name: kubelet
+        enabled: yes
+
+    - name: Add Helms's official GPG key
+      tags: install helm
+      ansible.builtin.apt_key:
+        url: https://baltocdn.com/helm/signing.asc
+        keyring: /etc/apt/keyrings/helm.gpg
+        state: present
+      when: inventory_hostname in groups["controls"]
+
+    - name: Add Helms repository
+      tags: install helm
+      ansible.builtin.apt_repository:
+        repo: deb [arch=amd64 signed-by=/etc/apt/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main
+        filename: helm
+        state: present
+      when: inventory_hostname in groups["controls"]
+
+    - name: Install Helm
+      tags: install helm
+      ansible.builtin.apt:
+        name: helm
+        state: present
+        update_cache: yes
+      when: inventory_hostname in groups["controls"]
+
+  handlers:
+    - name: restart containerd
+      tags: restart containerd
+      ansible.builtin.service:
+        name: containerd
+        state: restarted
+
+# ==========================================
+
+- name: Set up loadbalancer
+  tags: setup balancer
+  hosts: balancer
+  become: true
+  tasks:
+    - name: Install haproxy
+      tags: install haproxy
+      ansible.builtin.apt:
+        name: haproxy
+        state: present
+        update_cache: yes
+
+    - name: Copy haproxy config
+      tags: copy haproxy config
+      ansible.builtin.template:
+        src: templates/haproxy.cfg
+        dest: /etc/haproxy/haproxy.cfg
+      notify: restart haproxy
+
+  handlers:
+    - name: restart haproxy
+      ansible.builtin.service:
+        name: haproxy
+        state: restarted
+
+# ========================================
+
+- name: Set up control1
+  tags: set up control1
+  hosts: control1
+  become: true
+  tasks:
+    - name: Initialize the kubernetes control plane
+      tags: initialize control plane
+      command: kubeadm init --control-plane-endpoint "balancer:6443" --upload-certs --pod-network-cidr=10.95.0.0/16 --service-cidr=10.96.0.0/16
+      register: kubeadm_output
+      ignore_errors: true
+
+    - name: Generate new token again
+      tags: gen token
+      command: kubeadm token create --print-join-command
+      register: gen_token_output
+
+    - name: Set workers_join_command
+      tags: gen token
+      set_fact:
+        workers_join_command: "{{gen_token_output.stdout}}"
+
+    - name: Show workers_join_line
+      tags: gen token
+      debug: msg="{{workers_join_command}}"
+
+    - name: Upload cluster certs again
+      tags: upload certs
+      command: kubeadm init phase upload-certs --upload-certs
+      register: cluster_certs
+
+    - name: Set masters_join_command
+      tags: upload certs
+      set_fact:
+        masters_join_command: "{{workers_join_command}}--control-plane --certificate-key {{cluster_certs.stdout_lines[2]}}"
+
+    - name: show masters_join_command
+      tags: upload certs
+      debug: msg="{{masters_join_command}}"
+
+    - name: Create .kube directory
+      tags: copy admin.conf on master1
+      ansible.builtin.file:
+        path: $HOME/.kube
+        state: directory
+        mode: 0755
+
+    - name: Copy admin.conf $HOME/.kube
+      tags: copy admin.conf on master1
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: $HOME/.kube/config
+        remote_src: yes
+
+    - name: wait 60 seconds before add other controls
+      ansible.builtin.wait_for:
+        timeout: 60
+
+# ==========================================
+
+- name: Setup control2, control3
+  tags: setup control2 control3
+  hosts: control2,control3
+  become: true
+  tasks:
+    - name: Join control2 and control3 to control node cluster
+      tags: join to control cluster
+      command: "{{ hostvars['control1']['masters_join_command'] }}"
+      when: hostvars['control1']['masters_join_command'] is defined
+
+    - name: Create .kube directory
+      tags: copy admin.conf
+      ansible.builtin.file:
+        path: $HOME/.kube
+        state: directory
+        mode: 0755
+
+    - name: Copy admin.conf $HOME/.kube
+      tags: copy admin.conf
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: $HOME/.kube/config
+        remote_src: yes
+
+# ==========================================
+
+- name: Setup workers
+  tags: setup workers
+  hosts: node1,node2,node3
+  become: true
+  tasks:
+    - name: Join workers to kubernetes cluster
+      tags: join workers to cluster
+      command: "{{ hostvars['control1']['workers_join_command'] }}"
+      when: hostvars['control1']['workers_join_command'] is defined
+
+# ==========================================
+#! здесь надо бы включить direct mode, что не было накладных расходов на ip-ip туннели (по умолчанию режим работы calico ip-ip. но так как у нас ноды
+# в одной L2 сети, то нужно переключать на direct)
+- name: Install CNI Calico
+  tags: install cni calico
+  hosts: control1
+  become: true
+  tasks:
+    - name: Add the Calico helm repo
+      tags: add the calico helm repo
+      command: helm repo add projectcalico https://docs.tigera.io/calico/charts
+
+    - name: Create the tigera-operator namespace
+      tags: create the tigera-operator namespace
+      command: kubectl create namespace tigera-operator
+
+    - name: Install the Tigera operator and custom resource definitions
+      tags: install the Tigera operator
+      command: helm install calico projectcalico/tigera-operator --version v3.29.2 --namespace tigera-operator
+
+    # чтобы управлять с удалённой машины с помощью calicoctl нужно еще добавить конфиг. с control нод и так будет работать
+    - name: install calicoctl
+      tags: install calicoctl
+      ansible.builtin.get_url:
+        url: https://github.com/projectcalico/calico/releases/download/v3.29.2/calicoctl-linux-amd64
+        dest: /usr/local/bin/calicoctl
+        mode: "0755"
+
+# ==========================================
+# coredns приземляется почему-то на одну control ноду после первичной установки (и не обязательно на первую, на которой инициализирован кластер). Рестартим
+# чтобы раскидать на две ноды
+
+- name: Restart CoreDNS
+  tags: restart coredns
+  hosts: control1
+  become: true
+  tasks:
+    - name: Restart CoreDNS for distributing between control nodes
+      command: kubectl -n kube-system rollout restart deployment coredns
+
+# ==========================================
+
+- name: Install Kubernetes dashboard
+  tags: install kubernetes dashboard
+  hosts: control1
+  become: true
+  tasks:
+    - name: Setup Kubernetes Dashboard
+      command: "{{item}}"
+      with_items:
+        - helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/
+        - helm upgrade --install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard --create-namespace --namespace kubernetes-dashboard
+
+    - name: Copy admin-user.conf and admin-user-binding.conf
+      tags: copy admin conf
+      copy:
+        src: "{{item}}"
+        dest: $HOME
+      with_items:
+        - manifests/admin-user-service-account.yaml
+        - manifests/admin-user-cr-binding.yaml
+        - manifests/admin-user-secret.yaml
+
+    - name: create admin-user
+      tags: create admin-user
+      command: "{{item}}"
+      with_items:
+        - kubectl create -f $HOME/admin-user-service-account.yaml
+        - kubectl create -f $HOME/admin-user-cr-binding.yaml
+        - kubectl create -f $HOME/admin-user-secret.yaml
+
+    - name: Get long-live token for admin-user
+      tags: get long-live token
+      shell: 'kubectl get secret admin-user -n kubernetes-dashboard -o jsonpath="{.data.token}" | base64 -d'
+      register: lltoken
+
+    - name: Show long-live token
+      tags: get long-live token
+      debug: msg="long-live token '{{lltoken.stdout}}'"
+
+    - name: Show dashboard run command
+      tags: show dashboard run command
+      debug: msg="run 'kubectl -n kubernetes-dashboard port-forward svc/kubernetes-dashboard-kong-proxy 8443:443 --address=0.0.0.0' for port forwarding to Dashboard"
+
+# ==========================================
+
+- name: Install ingress controller "Ingress-nginx"
+  tags: install ingress controller
+  hosts: control1
+  become: true
+  tasks:
+    - name: Setup ingress controller
+      tags: setup ingress controller
+      command: kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.0-beta.0/deploy/static/provider/baremetal/deploy.yaml
+
+    - name: Scale ingress-nginx deployment to 2 replicas
+      tags: scale ingress-nginx
+      command: kubectl scale deployment ingress-nginx-controller --replicas 2 -n ingress-nginx
+
+    - name: create service for ingress controller
+      tags: create service for ingress controller
+      command: kubectl apply -f /vagrant/manifests/service-for-ingress-controller.yaml
+
+# ==========================================
+
+- name: Storage server setup
+  tags: storage server setup
+  hosts: storage
+  become: true
+  tasks:
+    - name: Install additional software
+      tags: install nfs-kernel-server
+      ansible.builtin.apt:
+        name:
+          - nfs-kernel-server
+        state: present
+        update_cache: yes
+
+    - name: Create nfs storage directory
+      tags: create nfs storage dir
+      ansible.builtin.file:
+        path: /storage/nfs
+        state: directory
+        mode: "0755"
+
+    - name: Copy exports configuration
+      tags: copy exports
+      ansible.builtin.copy:
+        src: templates/exports
+        dest: /etc/exports
+      notify: exportfs
+
+  handlers:
+    - name: exportfs
+      command: exportfs -a
+
+# ==========================================
+
+- name: Install nfs provisioner "Nfs-subdir-external-provisioner"
+  tags: install nfs provisioner
+  hosts: control1
+  become: true
+  tasks:
+    - name: Add nfs-subdir-external-provisioner repo
+      tags: add nfs-subdir-external-provisioner repo
+      command: helm repo add nfs-subdir-external-provisioner https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner
+
+    - name: Setup nfs-subdir-external-provisioner
+      tags: setup nfs-subdir-external-provisioner
+      command: helm install nfs-subdir-external-provisioner nfs-subdir-external-provisioner/nfs-subdir-external-provisioner --set nfs.server=192.168.30.12 --set nfs.path=/storage/nfs --set storageClass.onDelete=true
+
+# ==========================================
+
+- name: Deploy Nextcloud
+  tags: deploy nextcloud
+  hosts: control1
+  become: true
+  tasks:
+    - name: Add Nextcloud repo
+      tags: add nextcloud repo
+      command: helm repo add nextcloud https://nextcloud.github.io/helm/
+
+    - name: Helm repo update
+      tags: helm repo update
+      command: helm repo update
+
+    #    - name: Get Nextcloud values
+    #      tags: get nextcloud values
+    #      shell: "helm show values nextcloud/nextcloud > /vagrant/values.yml"
+
+    - name: wait 30 seconds while creating ingress-nginx service
+      ansible.builtin.wait_for:
+        timeout: 30
+
+    - name: Install Nextcloud app
+      tags: install Nextcloud app
+      command: helm install -f /vagrant/values.yml otus nextcloud/nextcloud
+    #- debug:
+    #    msg: "default web url: boardmaps.example.com; login: bmadmin; password: qqq111"

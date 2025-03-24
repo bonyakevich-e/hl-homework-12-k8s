@@ -1,0 +1,15 @@
+[controls]
+control1 ansible_host=192.168.30.14 ansible_user=vagrant ansible_ssh_private_key_file=.vagrant/machines/control1/virtualbox/private_key 
+control2 ansible_host=192.168.30.15 ansible_user=vagrant ansible_ssh_private_key_file=.vagrant/machines/control2/virtualbox/private_key 
+control3 ansible_host=192.168.30.16 ansible_user=vagrant ansible_ssh_private_key_file=.vagrant/machines/control3/virtualbox/private_key 
+
+[workers]
+node1 ansible_host=192.168.30.17 ansible_user=vagrant ansible_ssh_private_key_file=.vagrant/machines/node1/virtualbox/private_key
+node2 ansible_host=192.168.30.18 ansible_user=vagrant ansible_ssh_private_key_file=.vagrant/machines/node2/virtualbox/private_key
+node3 ansible_host=192.168.30.11 ansible_user=vagrant ansible_ssh_private_key_file=.vagrant/machines/node3/virtualbox/private_key
+
+[balancer]
+balancer ansible_host=192.168.30.13 ansible_user=vagrant ansible_ssh_private_key_file=.vagrant/machines/balancer/virtualbox/private_key
+
+[storage]
+storage ansible_host=192.168.30.12 ansible_user=vagrant ansible_ssh_private_key_file=.vagrant/machines/storage/virtualbox/private_key
