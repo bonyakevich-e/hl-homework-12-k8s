@@ -18,7 +18,7 @@ $ vagrant up
 $ ansible-playbook -i hosts playbook.yml
 ```
 > [!IMPORTANT]
-> Предварительно, при необходимости, изменить ip-адреса виртуальных машин в файлах Vagrantfile, hosts, templates/haproxy, templates/exports. В файле templates/50-vagrant.yaml нужно изменить адрес шлюза по умолчанию, который будет использоваться виртуальными машинами.
+> Предварительно, при необходимости, изменить ip-адреса виртуальных машин в файлах Vagrantfile, hosts, templates/haproxy, templates/exports. В файле templates/50-vagrant.yaml нужно изменить адрес шлюза по умолчанию, который будет использоваться виртуальными машинами. В файле playbook.yml в таске "Install nfs provisioner "Nfs-subdir-external-provisioner"" нужно изменить ip адрес nfs сервера
 
 #### Cхема кластера Kubernetes после развёртывания стенда:
 
