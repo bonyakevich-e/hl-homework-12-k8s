@@ -43,12 +43,25 @@ $ ansible-playbook -i hosts playbook.yml
 Для доступа к веб-приложению Nextcloud нужно использовать адрес: https://otus.highload.com (предварительно нужно настроит резолвинг этого доменного имени во внешний ip адрес сервера balancer).
 
 #### СКРИНШОТЫ РАЗВЁРНУТОГО СТЕНДА:
-![Screenshot from 2025-03-22 17-38-52](https://github.com/user-attachments/assets/9092a780-fe14-467f-b7a5-b813cb224b3c)
-![Screenshot from 2025-03-22 17-38-19](https://github.com/user-attachments/assets/79d85cac-a9cc-46c8-80ca-04ee52bcc1c2)
-![Screenshot from 2025-03-22 17-38-02](https://github.com/user-attachments/assets/ee25b1dc-c3a5-4776-9cdc-3d1b0e851795)
-![Screenshot from 2025-03-22 17-37-46](https://github.com/user-attachments/assets/6e9f4a8d-e702-481b-93c2-fbda1c6ce1ee)
-![Screenshot from 2025-03-22 17-37-21](https://github.com/user-attachments/assets/0a08fde2-7a2f-46b6-8b34-293a33c94e89)
-![Screenshot from 2025-03-22 17-37-07](https://github.com/user-attachments/assets/4c1ec5f9-b7b9-4754-88b8-dd6b92d8a598)
-![Screenshot from 2025-03-22 17-36-51](https://github.com/user-attachments/assets/0cebed38-3d16-46c5-ac99-0e8d950c7195)
-![Screenshot from 2025-03-22 17-36-34](https://github.com/user-attachments/assets/4af85065-5a1b-4f9f-a501-2c49495d0885)
-![Screenshot from 2025-03-22 17-35-55](https://github.com/user-attachments/assets/2b914f05-c58b-4175-81ec-84acf90dd6db)
+
+![Screenshot from 2025-03-22 17-37-46](https://github.com/user-attachments/assets/79af6261-033a-4555-8260-9997a88dd20c)
+
+![Screenshot from 2025-03-22 17-36-34](https://github.com/user-attachments/assets/8b09aa5b-e016-4d4c-8c1f-b26dec173104)
+
+![Screenshot from 2025-03-22 17-35-55](https://github.com/user-attachments/assets/090837ec-54de-47a9-a972-f7dfc3d48a8d)
+
+![Screenshot from 2025-03-22 17-36-51](https://github.com/user-attachments/assets/5281a7e6-ff0a-4135-83f3-aeb2e25d72d5)
+
+![Screenshot from 2025-03-22 17-37-07](https://github.com/user-attachments/assets/f243b432-cbb6-4bdf-8ad5-4200e8204e5c)
+
+![Screenshot from 2025-03-22 17-37-21](https://github.com/user-attachments/assets/e1fc89b5-9411-4b97-ab64-93a8e46768af)
+
+![Screenshot from 2025-03-22 17-38-02](https://github.com/user-attachments/assets/fddd735c-0e66-454a-927e-4a53bb416a48)
+
+![Screenshot from 2025-03-22 17-38-19](https://github.com/user-attachments/assets/78b8c924-80f5-4963-ac62-054b4fd12ae5)
+
+![Screenshot from 2025-03-22 17-38-52](https://github.com/user-attachments/assets/e4114d54-2060-4b94-b22d-2bb287338d7a)
+
+
+
+
