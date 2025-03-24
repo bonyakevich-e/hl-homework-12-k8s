@@ -12,14 +12,14 @@
 - `balancer` - балансировщик/прокси HAProxy. Используется как единая точка входа для управления кластером Kubernetes и для доступа к развёрнутому приложению Nextcloud извне
 - `storage` - NFS-хранилище. Используется для хранения данных Nextcloud и PostgreSQL
 
-Для развёртнывания стенда и деплоя в него веб-приложения Nextcloud достаточно запустить:
+Для развёртывания стенда и деплоя в него веб-приложения Nextcloud достаточно запустить:
 ```
 $ ansible-playbook -i hosts playbook.yml
 ```
 > [!IMPORTANT]
-> Предварительно, при необходимости, нужно изменить ip-адреса виртуальных машин в файлах Vagrantfile, hosts, templates/haproxy, templates/exports. В файле templates/50-vagrant.yaml нужно изменить адреса шлюза по умолчанию, который будет использоваться виртуальными машинами.
+> Предварительно, при необходимости, нужно изменить ip-адреса виртуальных машин в файлах Vagrantfile, hosts, templates/haproxy, templates/exports. В файле templates/50-vagrant.yaml нужно изменить адрес шлюза по умолчанию, который будет использоваться виртуальными машинами.
 
-#### Cхема кластера Kubernetes после развёртнывания стенда:
+#### Cхема кластера Kubernetes после развёртывания стенда:
 
 ![otus highload scheme v6 kubernetes структурная схема](https://github.com/user-attachments/assets/adcc444f-c5d6-466b-a90b-77b9dea64d44)
 
@@ -40,7 +40,7 @@ $ ansible-playbook -i hosts playbook.yml
 - Для динамического провижена Persistent Volumes через Persistent Volume Claims используется __NFS Subdir External Provisioner__ - https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner 
 - Для развёртывания веб-приложения Nextcloud используется __Nextcloud Helm Chart__  - https://github.com/nextcloud/helm/tree/main/charts/nextcloud
 
-Для доступа к веб-приложению Nextcloud нужно использовать адрес: https://otus.highload.com (предварительно нужно настроит резолвинг этого доменного имени во внешний ip адрес сервера balancer).
+Для доступа к веб-приложению Nextcloud нужно использовать адрес: https://otus.highload.com (предварительно нужно настроить резолвинг этого доменного имени во внешний ip адрес сервера balancer).
 
 #### СКРИНШОТЫ РАЗВЁРНУТОГО СТЕНДА:
 
